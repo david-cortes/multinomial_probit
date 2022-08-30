@@ -26,7 +26,7 @@ $$
 
 (where $\mathbf{\Beta_{k, n}}$ and $\mathbf{\Sigma}$ are model parameters, and MVN denotes the multivariate normal distribution)
 
-Then, from $\text{score_k}$, the probability that this row will belong to each class is given by the probability that each corresponding entry in $\text{score}^k$ is higher than the other entries (considering that it contains random multivariate-distributed noise).
+Then, from $\text{score}^k$, the probability that this row will belong to each class is given by the probability that each corresponding entry in $\text{score}^k$ is higher than the other entries (considering that it contains random multivariate-distributed noise).
 
 The calculation of these probabilities involves calculating the CDF (cumulative distribution function) of multivariate normal distributions, whose calculation at high accuracy is not computationally tractable - as such, this type of model is typically fitted through maximum simulated likelihood methods with limited random samples, but this package instead uses much faster and stable approximations to the MVN CDF given by the TVBS method (see references for more details) and follows a typicall optimization procedure (BFGS) with analytical gradients (no randomization is involved).
 
