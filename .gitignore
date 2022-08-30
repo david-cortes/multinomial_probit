@@ -1,0 +1,45 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+.directory
+MANIFEST
+
+
+# dist files
+dist/
+*.zip
+*.tar.gz
+*.Rproj
+
+build/
+	*.*
+
+# compiled code
+*.so
+*.o
+*.out
+*.exe
+*.lib
+*.obj
+*.dynlib
+*.pyd
+*.dll
+test
+multinomial_probit/cpp_wrapper.cpp
+multinomial_probit/cpp_wrapper.h
+
+
+multinomial_probit.egg-info/
+	*
+
+build/
+	*
+.Rproj.user
+.Rbuildignore
+.Rhistory
+safe/*
+src/Makevars
+config.log
+config.status
+configure~
+autom4te.cache/*

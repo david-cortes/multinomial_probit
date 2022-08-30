@@ -1,0 +1,4 @@
+numpy>=1.18
+cython
+scipy
+scikit-learn
