@@ -11,12 +11,15 @@ When dealing with multi-class classification, one typically uses models such as 
 Multinomial probit regression, on the other hand, explicitly models the correlations among the predictions of each class, and models the variance of each class' predictions - thus, if e.g. the prediction / score for one class increases, then the probabilities for every other class will shift accordingly, given the correlation matrix, which is a property that is not shared by e.g. one-vs-rest logistic regressions.
 
 In more detail, if we take a given row and fitted model parameters, a multinomial probit model with $k$ classes would make predictions through a latent process as follows:
+
 $$
 \text{pred} = \mathbf{\Beta_{k, n}} \mathbf{x_n}
 $$
+
 $$
 \text{score} = \text{pred} + \mathbf{\epsilon_k}
 $$
+
 $$
 \mathbf{\epsilon} \sim \text{MVN}(\mathbf{0}, \mathbf{\Sigma})
 $$
