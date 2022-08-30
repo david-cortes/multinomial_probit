@@ -13,18 +13,18 @@ Multinomial probit regression, on the other hand, explicitly models the correlat
 In more detail, if we take a given row and fitted model parameters, a multinomial probit model with $k$ classes would make predictions through a latent process as follows:
 
 $$
-\text{pred} = \mathbf{\Beta_{k, n}} \mathbf{x_n}
+\text{pred} = \mathbf{\Beta^{k, n}} \mathbf{x^n}
 $$
 
 $$
-\text{score} = \text{pred} + \mathbf{\epsilon_k}
+\text{score} = \text{pred} + \mathbf{\epsilon^k}
 $$
 
 $$
 \mathbf{\epsilon} \sim \text{MVN}(\mathbf{0}, \mathbf{\Sigma})
 $$
 
-(where $\mathbf{\Beta_{k, n}}$ and $\mathbf{\Sigma}$ are model parameters, and MVN denotes the multivariate normal distribution)
+(where $\mathbf{\Beta^{k, n}}$ and $\mathbf{\Sigma}$ are model parameters, and MVN denotes the multivariate normal distribution)
 
 Then, from $\text{score}^k$, the probability that this row will belong to each class is given by the probability that each corresponding entry in $\text{score}^k$ is higher than the other entries (considering that it contains random multivariate-distributed noise).
 
