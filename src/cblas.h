@@ -2,7 +2,6 @@
 
 #if !defined(BLAS_H) && !defined(FOR_R)
 extern "C" {
-void dscal_(const int*, const double*, double*, const int*);
 double ddot_(int const *, double const *, int const *, double const *, int const *);
 void dcopy_(int const *, double const *, int const *, double *, int const *);
 void daxpy_(int const *, double const *, double const *, int const *, double *, int const *);
@@ -25,12 +24,6 @@ typedef enum CBLAS_UPLO      {CblasUpper=121, CblasLower=122} CBLAS_UPLO;
 typedef enum CBLAS_DIAG      {CblasNonUnit=131, CblasUnit=132} CBLAS_DIAG;
 typedef enum CBLAS_SIDE      {CblasLeft=141, CblasRight=142} CBLAS_SIDE;
 typedef CBLAS_ORDER CBLAS_LAYOUT;
-
-static inline
-void cblas_dscal(const int N, const double alpha, double *X, const int incX)
-{
-    F77_CALL(dscal)(&N, &alpha, X, &incX);
-}
 
 static inline
 void cblas_dcopy(const int n, const double *x, const int incx, double *y, const int incy)

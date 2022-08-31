@@ -102,12 +102,13 @@ double loggrad_R01
     if (n <= 1) return 0.;
 
     const double rtilde = std::fma(-R[1], R[1], 1.);
+    const double mult2 = (
+        log_inv_twoPI
+        - std::log(std::sqrt(rtilde))
+        - (x[0]*x[0] + x[1]*x[1] - 2.*R[1]*x[0]*x[1]) / (2. * rtilde)
+    );
     if (n == 2) {
-        return (
-            log_inv_twoPI
-            - std::log(std::sqrt(rtilde))
-            - (x[0]*x[0] + x[1]*x[1] - 2.*x[0]*x[1]) / (2. * rtilde)
-        );
+        return mult2;
     }
 
     const int n2 = n - 2;
@@ -120,12 +121,7 @@ double loggrad_R01
             x[1] * (R[ix+2+n] - R[ix+2]*R[1])
         ) / rtilde;
     }
-    #ifndef _MSC_VER
-    #pragma omp simd
-    #endif
-    for (int ix = 0; ix < n2; ix++) {
-        newX[ix] += x[ix+2];
-    }
+    cblas_daxpy(n2, 1., x + 2, 1, newX, 1);
 
     standardize_norm_prob(
         newX,
@@ -133,8 +129,6 @@ double loggrad_R01
         newV,
         n2
     );
-
-    double mult2 = std::log(rtilde) + (x[0]*x[0] + x[1]*x[1] - 2.*R[1]*x[0]*x[1]) / rtilde;
 
     double cdf = norm_logcdf(
         newX,
@@ -145,9 +139,5 @@ double loggrad_R01
         buffer2
     );
 
-    return (
-        cdf
-        + log_inv_twoPI
-        - 0.5 * mult2
-    );
+    return cdf + mult2;
 }

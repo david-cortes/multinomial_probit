@@ -72,6 +72,7 @@ void matrix_inverse(double *restrict X, double *restrict Xinv, const int n)
 
 void L_square_from_flat(const double *restrict Lflat, double *restrict Lsq, const int n)
 {
+    std::fill(Lsq, Lsq + n*n, 0.);
     Lsq[0] = 1.;
     int counter = 0;
     for (int row = 1; row < n; row++) {

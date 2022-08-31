@@ -921,8 +921,7 @@ double mnp_fun_grad
         }
         else {
             for (int row = 0; row < m; row++) {
-                cblas_dscal(ktri, weights_reordered[row], nonsummed_gradRho.data() + row*ktri, 1);
-                cblas_daxpy(ktri, 1., nonsummed_gradRho.data() + row*ktri, 1, grad_Rho.data() + cl*ktri, 1);
+                cblas_daxpy(ktri, weights_reordered[row], nonsummed_gradRho.data() + row*ktri, 1, grad_Rho.data() + cl*ktri, 1);
             }
         }
     }

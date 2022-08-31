@@ -365,16 +365,16 @@ def _mnp_fun_grad(optvars, X, y, w, k, lam, fit_intercept, nthreads):
     slice_chunk = n
     for cl in range(k-1):
         if not w.shape[0]:
-            grad_out[slice_begin:slice_begin+slice_chunk] = np.sum(gradX[:, cl].reshape((-1,1)) * X, axis=0)
+            grad_out[slice_begin:slice_begin+slice_chunk] = np.einsum("i,ij->j", gradX[:, cl], X)
         else:
-            grad_out[slice_begin:slice_begin+slice_chunk] = np.sum(gradX[:, cl].reshape((-1,1)) * X * w.reshape((-1,1)), axis=0)
+            grad_out[slice_begin:slice_begin+slice_chunk] = np.einsum("i,ij->j", gradX[:, cl]*w, X)
         slice_begin += slice_chunk
 
     if lam:
         if fit_intercept:
-            fun += np.dot(optvars[numL:], optvars[numL:]) - np.dot(coefs[:,0], coefs[:,0])
+            fun += lam*(np.dot(optvars[numL:], optvars[numL:]) - np.dot(coefs[:,0], coefs[:,0]))
         else:
-            fun += np.dot(optvars[numL:], optvars[numL:])
+            fun += lam*np.dot(optvars[numL:], optvars[numL:])
         grad_out[numL:] += 2*lam*optvars[numL:]
         ## don't regularize the intercepts
         if fit_intercept:
@@ -398,7 +398,7 @@ def _mnp_fun(optvars, X, y, w, k, lam, fit_intercept, nthreads):
     )
     if lam:
         if fit_intercept:
-            fun += np.dot(optvars[numL:], optvars[numL:]) - np.dot(coefs[:,0], coefs[:,0])
+            fun += lam*(np.dot(optvars[numL:], optvars[numL:]) - np.dot(coefs[:,0], coefs[:,0]))
         else:
-            fun += np.dot(optvars[numL:], optvars[numL:])
+            fun += lam*np.dot(optvars[numL:], optvars[numL:])
     return fun
