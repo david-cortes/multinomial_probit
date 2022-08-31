@@ -74,11 +74,11 @@ class MultinomialProbitRegression(BaseEstimator):
            Transportation Research Part B: Methodological 109 (2018): 238-256.
     .. [2] Plackett, Robin L. "A reduction formula for normal multivariate integrals." Biometrika 41.3/4 (1954): 351-360.
     """
-    def __init__(self, lambda_=0., fit_intercept=True, warm_start=False, presolve_logitstic=False, n_jobs=-1):
+    def __init__(self, lambda_=0., fit_intercept=True, warm_start=False, presolve_logistic=False, n_jobs=-1):
         self.lambda_ = lambda_
         self.fit_intercept = fit_intercept
         self.warm_start = warm_start
-        self.presolve_logitstic = presolve_logitstic
+        self.presolve_logistic = presolve_logistic
         self.n_jobs = n_jobs
     
     def fit(self, X, y, sample_weights=None):
@@ -139,8 +139,7 @@ class MultinomialProbitRegression(BaseEstimator):
             old_opt = self._Lflat
             if optvars.shape[0] == self._Lflat.shape[0]:
                 optvars = self._Lflat
-
-        if self.presolve_logitstic:
+        elif self.presolve_logistic:
             from sklearn.linear_model import LogisticRegression
             model_logistic = LogisticRegression(
                 multi_class="multinomial",
