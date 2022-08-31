@@ -475,17 +475,7 @@ double norm_logcdf
                 return NAN;
             }
         }
-    }   
-
-    double *restrict mu_trunc = buffer; buffer += n;
-    double *restrict L = buffer; buffer += n*n;
-    double *restrict D = buffer; buffer += n*n;
-    double *restrict temp1 = buffer; buffer += n*n;
-    double *restrict temp2 = buffer; buffer += n*n;
-    double *restrict temp3 = buffer; buffer += 2*(n-2);
-    double *restrict temp4 = buffer; buffer += 2*(n-2);
-    double *restrict rho_copy = buffer; buffer += n*n;
-
+    }
 
     int size_block1, size_block2, pos_st;
     double p_independent;
@@ -499,15 +489,18 @@ double norm_logcdf
             double p1 = 0.;
             double p2 = 0.;
 
+            /* TODO: maybe should move these into separate buffers so that it can reuse
+               'rho_reordered' and avoid doing this allocation */
+            std::vector<double> rho_copy((n-1)*(n-1));
             if (size_block1) {
                 F77_CALL(dlacpy)(
                     "A", &size_block1, &size_block1,
                     rho_reordered + pos_st * (n + 1), &n,
-                    rho_copy, &size_block1 FCONE
+                    rho_copy.data(), &size_block1 FCONE
                 );
                 p1 = norm_logcdf(
                     x_reordered + pos_st,
-                    rho_copy,
+                    rho_copy.data(),
                     size_block1,
                     false,
                     buffer,
@@ -520,12 +513,12 @@ double norm_logcdf
                     F77_CALL(dlacpy)(
                         "A", &size_block2, &size_block2,
                         rho_reordered + (pos_st + size_block1) * (n + 1), &n,
-                        rho_copy, &size_block2 FCONE
+                        rho_copy.data(), &size_block2 FCONE
                     );
                 }
                 p2 = norm_logcdf(
                     x_reordered + pos_st + size_block1,
-                    rho_copy,
+                    rho_copy.data(),
                     size_block2,
                     false,
                     buffer,
@@ -536,6 +529,14 @@ double norm_logcdf
             return p1 + p2 + p_independent;
         }
     }
+
+    double *restrict mu_trunc = buffer; buffer += n;
+    double *restrict L = buffer; buffer += n*n;
+    double *restrict D = buffer; buffer += n*n;
+    double *restrict temp1 = buffer; buffer += n*n;
+    double *restrict temp2 = buffer; buffer += n*n;
+    double *restrict temp3 = buffer; buffer += 2*(n-2);
+    double *restrict temp4 = buffer; buffer += 2*(n-2);
 
     sort_ascending(
         x_reordered,

@@ -87,7 +87,7 @@ double norm_logcdf
     double *restrict rho_reordered,
     const int n,
     const bool check_rho,
-    double *restrict buffer, /* dim: 5*n^2 + 3*n - 8 */
+    double *restrict buffer, /* dim: 4*n^2 + 3*n - 8 */
     int *restrict buffer2
 );
 

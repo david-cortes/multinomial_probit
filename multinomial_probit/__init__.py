@@ -38,6 +38,11 @@ class MultinomialProbitRegression(BaseEstimator):
     warm_start : bool
         In successive calls to ``fit``, whether to reuse previous solutions as starting point
         for the optimization procedure.
+    presolve_logitstic : bool
+        Whether to pre-solve for the coefficients by fitting a multinomial *logistic* regression
+        first and use that solution as starting point for optimization. Note that, when doing this,
+        oftentimes it will not be possible to make further updates (since required step sizes would
+        become too small) and will end up using this starting point as the final solution.
     n_jobs : int
         Number of parallel threads to use. Negative values are interpreted according to joblib's
         formula: n_cpus - n_jobs + 1
@@ -69,10 +74,11 @@ class MultinomialProbitRegression(BaseEstimator):
            Transportation Research Part B: Methodological 109 (2018): 238-256.
     .. [2] Plackett, Robin L. "A reduction formula for normal multivariate integrals." Biometrika 41.3/4 (1954): 351-360.
     """
-    def __init__(self, lambda_=0., fit_intercept=True, warm_start=False, n_jobs=-1):
+    def __init__(self, lambda_=0., fit_intercept=True, warm_start=False, presolve_logitstic=False, n_jobs=-1):
         self.lambda_ = lambda_
         self.fit_intercept = fit_intercept
         self.warm_start = warm_start
+        self.presolve_logitstic = presolve_logitstic
         self.n_jobs = n_jobs
     
     def fit(self, X, y, sample_weights=None):
@@ -133,6 +139,16 @@ class MultinomialProbitRegression(BaseEstimator):
             old_opt = self._Lflat
             if optvars.shape[0] == self._Lflat.shape[0]:
                 optvars = self._Lflat
+
+        if self.presolve_logitstic:
+            from sklearn.linear_model import LogisticRegression
+            model_logistic = LogisticRegression(
+                multi_class="multinomial",
+                fit_intercept=False,
+                C=0.5/max(1.,lam)
+            ).fit(X,y)
+            optvars[numL:] = (model_logistic.coef_[1:,:] - model_logistic.coef_[0,:]).reshape(-1)
+
 
         args = (X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
         res = minimize(_mnp_fun_grad, optvars, args, jac=True, method="BFGS")

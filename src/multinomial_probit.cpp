@@ -330,8 +330,8 @@ double mnp_likelihood
     
     std::vector<std::vector<double>> thread_buffer1(nthreads);
     std::vector<std::vector<int>> thread_buffer2(nthreads);
-    int size_thread_dwork = 5*k*k + 3*k - 8  +  k1+k1*k1;
-    /* shorthand: 6*k^2 + 4*k */
+    int size_thread_dwork = 4*k*k + 3*k - 8  +  k1+k1*k1;
+    /* shorthand: 5*k^2 + 4*k */
     for (int tid = 0; tid < nthreads; tid++) {
         thread_buffer1[tid].resize(size_thread_dwork);
         thread_buffer2[tid].resize(k);
