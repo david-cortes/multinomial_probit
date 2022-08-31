@@ -40,9 +40,8 @@ class MultinomialProbitRegression(BaseEstimator):
         for the optimization procedure.
     presolve_logitstic : bool
         Whether to pre-solve for the coefficients by fitting a multinomial *logistic* regression
-        first and use that solution as starting point for optimization. Note that, when doing this,
-        oftentimes it will not be possible to make further updates (since required step sizes would
-        become too small) and will end up using this starting point as the final solution.
+        first and use that solution as starting point for optimization (after a smaller second
+        presolve pass solving only for the Cholesky of the covariance matrix).
     n_jobs : int
         Number of parallel threads to use. Negative values are interpreted according to joblib's
         formula: n_cpus - n_jobs + 1
@@ -74,7 +73,7 @@ class MultinomialProbitRegression(BaseEstimator):
            Transportation Research Part B: Methodological 109 (2018): 238-256.
     .. [2] Plackett, Robin L. "A reduction formula for normal multivariate integrals." Biometrika 41.3/4 (1954): 351-360.
     """
-    def __init__(self, lambda_=0., fit_intercept=True, warm_start=False, presolve_logistic=False, n_jobs=-1):
+    def __init__(self, lambda_=0., fit_intercept=True, warm_start=False, presolve_logistic=True, n_jobs=-1):
         self.lambda_ = lambda_
         self.fit_intercept = fit_intercept
         self.warm_start = warm_start
@@ -148,6 +147,17 @@ class MultinomialProbitRegression(BaseEstimator):
                 C=0.5/max(1.,lam)
             ).fit(X,y)
             optvars[numL:] = (model_logistic.coef_[1:,:] - model_logistic.coef_[0,:]).reshape(-1)
+            # now update chol(Sigma) indepdendently before proceeding
+            coefs = optvars[numL:].reshape((self.k_-1,n))
+            args_onlyrho = (coefs, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
+            optvars_onlyrho = optvars[:numL]
+            
+            # Note: finite differencing here is roughly equally as slow as gradient calculations.
+            # What's more, since the CDFs calculated here are not exact, the gradients for Rho
+            # are usually more precise when obtained through finite differencing
+            res = minimize(_mnp_fun_onlyrho, optvars_onlyrho, args_onlyrho, method="BFGS")
+            optvars[:numL] = res["x"]
+
 
 
         args = (X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
@@ -416,3 +426,12 @@ def _mnp_fun(optvars, X, y, w, k, lam, fit_intercept, nthreads):
         else:
             fun += lam*np.dot(optvars[numL:], optvars[numL:])
     return fun
+
+def _mnp_fun_onlyrho(optvars, coefs, X, y, w, k, lam, fit_intercept, nthreads):
+    numL = k + int(k*(k-1)/2) - 1
+    Lflat = optvars[:numL]
+    pred = X @ coefs.T
+
+    return _cpp_wrapper.wrapped_mnp_fun(
+        y, pred, Lflat, w, nthreads
+    )
