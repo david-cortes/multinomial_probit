@@ -27,10 +27,10 @@ class build_ext_subclass( build_ext ):
             self.set_cxxstd()
 
             # for e in self.extensions:
-            #     # e.extra_compile_args = ["-std=c++11", "-fsanitize=address", "-static-libasan", "-ggdb"]
-            #     # e.extra_link_args    = ["-fsanitize=address", "-static-libasan"]
+            #     e.extra_compile_args += ["-fsanitize=address", "-static-libasan", "-ggdb"]
+            #     e.extra_link_args    += ["-fsanitize=address", "-static-libasan"]
 
-            #     e.extra_compile_args = ["-ggdb"]
+            #     e.extra_compile_args += ["-ggdb"]
 
         build_ext.build_extensions(self)
 

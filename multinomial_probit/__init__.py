@@ -153,16 +153,14 @@ class MultinomialProbitRegression(BaseEstimator):
         for opt_iter in range(maxiter):
             f, g = _mnp_fun_grad(optvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
 
-            if opt_iter == 0:
-                search_dir_ = -g
-            else:
+            if opt_iter > 0:
                 bfgs.update(f - prev_f, g - prev_g)
-                search_dir_ = -bfgs.dot(g)
+            search_dir_ = -bfgs.dot(g)
 
             step = 1.0
             took_step = False
 
-            for search_dir in [search_dir_] + ([g] if opt_iter > 0 else []):
+            for search_dir in [search_dir_, -g]:
                 for ls in range(maxls):
                     newvars = optvars + step*search_dir
                     newf = _mnp_fun(newvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
@@ -195,7 +193,7 @@ class MultinomialProbitRegression(BaseEstimator):
                 if took_step:
                     break
 
-            if (not took_step) or np.abs(f - newf) <= 1e-16:
+            if (not took_step) or np.abs(f - newf) <= 1e-8:
                 break
 
             prev_g = g
