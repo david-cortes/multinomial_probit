@@ -140,6 +140,7 @@ class MultinomialProbitRegression(BaseEstimator):
             if optvars.shape[0] == self._Lflat.shape[0]:
                 optvars = self._Lflat
         elif self.presolve_logistic:
+            assert np.all(np.unique(y) == np.arange(self.k_))
             from sklearn.linear_model import LogisticRegression
             model_logistic = LogisticRegression(
                 multi_class="multinomial",
