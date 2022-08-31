@@ -1,8 +1,9 @@
 import numpy as np
 from . import _cpp_wrapper
 import ctypes
-from scipy.optimize import minimize, BFGS
+from scipy.optimize import minimize, BFGS, approx_fprime
 from sklearn.base import BaseEstimator
+from sklearn.linear_model import LogisticRegression
 import multiprocessing
 from scipy.sparse import issparse, isspmatrix_csr, hstack, coo_matrix
 
@@ -35,6 +36,16 @@ class MultinomialProbitRegression(BaseEstimator):
         by the number of rows).
     fit_intercept : bool
         Whether to add intercepts to the coefficients for each class.
+    chol_grad : str, one of "finite_diff" or "plackett"
+        How to calculate gradients for the Cholesky of the model's covariance matrix.
+        If passing "plackett", will use Plackett's formula with the same CDF approximation as the rest
+        of the procedure.
+        If passing "finite_diff", will use finite differencing.
+        While in theory the closed-form from Plackett should be more precise, in practice,
+        since the calculation of the CDF is already an approximation with some inaccuracy, the
+        finite differencing approach tends to be more precise.
+        Note that both approaches involve the same number of CDF calculations albeit Plackett's are
+        for lower-dimensional problems, thus finite differencing is not too much slower.
     warm_start : bool
         In successive calls to ``fit``, whether to reuse previous solutions as starting point
         for the optimization procedure.
@@ -73,9 +84,10 @@ class MultinomialProbitRegression(BaseEstimator):
            Transportation Research Part B: Methodological 109 (2018): 238-256.
     .. [2] Plackett, Robin L. "A reduction formula for normal multivariate integrals." Biometrika 41.3/4 (1954): 351-360.
     """
-    def __init__(self, lambda_=0., fit_intercept=True, warm_start=False, presolve_logistic=True, n_jobs=-1):
+    def __init__(self, lambda_=0., fit_intercept=True, chol_grad="finite_diff", warm_start=False, presolve_logistic=True, n_jobs=-1):
         self.lambda_ = lambda_
         self.fit_intercept = fit_intercept
+        self.chol_grad = chol_grad
         self.warm_start = warm_start
         self.presolve_logistic = presolve_logistic
         self.n_jobs = n_jobs
@@ -100,6 +112,7 @@ class MultinomialProbitRegression(BaseEstimator):
             The fitted model (note that it is also modified in-place)
         """
         assert self.lambda_ >= 0
+        assert self.chol_grad in ["finite_diff", "plackett"]
 
         y, sample_weights = self._check_y_and_weights(y, sample_weights)
         self.k_ = y.max() + 1
@@ -140,7 +153,6 @@ class MultinomialProbitRegression(BaseEstimator):
                 optvars = self._Lflat
         elif self.presolve_logistic:
             assert np.all(np.unique(y) == np.arange(self.k_))
-            from sklearn.linear_model import LogisticRegression
             model_logistic = LogisticRegression(
                 multi_class="multinomial",
                 fit_intercept=False,
@@ -151,16 +163,15 @@ class MultinomialProbitRegression(BaseEstimator):
             coefs = optvars[numL:].reshape((self.k_-1,n))
             args_onlyrho = (coefs, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
             optvars_onlyrho = optvars[:numL]
-            
+
             # Note: finite differencing here is roughly equally as slow as gradient calculations.
             # What's more, since the CDFs calculated here are not exact, the gradients for Rho
             # are usually more precise when obtained through finite differencing
             res = minimize(_mnp_fun_onlyrho, optvars_onlyrho, args_onlyrho, method="BFGS")
             optvars[:numL] = res["x"]
 
-
-
-        args = (X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
+        use_plackett = self.chol_grad == "plackett"
+        args = (X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs, use_plackett)
         res = minimize(_mnp_fun_grad, optvars, args, jac=True, method="BFGS")
         optvars = res["x"]
 
@@ -177,7 +188,7 @@ class MultinomialProbitRegression(BaseEstimator):
         bfgs.H = res["hess_inv"]
     
         for opt_iter in range(maxiter):
-            f, g = _mnp_fun_grad(optvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
+            f, g = _mnp_fun_grad(optvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs, use_plackett)
 
             if opt_iter > 0:
                 bfgs.update(f - prev_f, g - prev_g)
@@ -189,7 +200,7 @@ class MultinomialProbitRegression(BaseEstimator):
             for search_dir in [search_dir_, -g]:
                 for ls in range(maxls):
                     newvars = optvars + step*search_dir
-                    newf = _mnp_fun(newvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
+                    newf = _mnp_fun(newvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs, use_plackett)
                     if (ls == 0):
                         newf0 = newf
                     predf = step * np.dot(g, search_dir)
@@ -369,7 +380,7 @@ class MultinomialProbitRegression(BaseEstimator):
             sample_weights = np.ones(y.shape[0])
         return y, sample_weights
 
-def _mnp_fun_grad(optvars, X, y, w, k, lam, fit_intercept, nthreads):
+def _mnp_fun_grad(optvars, X, y, w, k, lam, fit_intercept, nthreads, use_plackett):
     m = X.shape[0]
     n = X.shape[1]
     numL = k + int(k*(k-1)/2) - 1
@@ -378,8 +389,11 @@ def _mnp_fun_grad(optvars, X, y, w, k, lam, fit_intercept, nthreads):
     pred = X @ coefs.T
 
     fun, gradX, gradL = _cpp_wrapper.wrapped_mnp_fun_grad(
-        y, pred, Lflat, w, nthreads, False
+        y, pred, Lflat, w, nthreads, not use_plackett
     )
+
+    if not use_plackett:
+        gradL = approx_fprime(Lflat, _mnp_fun_onlyrho, 1e-5, coefs, X, y, w, k, lam, fit_intercept, nthreads)
 
     grad_out = np.empty(optvars.shape[0])
     grad_out[:numL] = gradL
@@ -409,7 +423,7 @@ def _mnp_fun_grad(optvars, X, y, w, k, lam, fit_intercept, nthreads):
 
     return fun, grad_out
 
-def _mnp_fun(optvars, X, y, w, k, lam, fit_intercept, nthreads):
+def _mnp_fun(optvars, X, y, w, k, lam, fit_intercept, nthreads, use_plackett):
     m = X.shape[0]
     n = X.shape[1]
     numL = k + int(k*(k-1)/2) - 1
