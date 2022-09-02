@@ -24,6 +24,7 @@ void swap_entries_sq_matrix(double *restrict v, double *restrict X, const int ld
 void fill_lower_triangle(double *restrict A, int n);
 void matrix_inverse(double *restrict X, double *restrict Xinv, const int n);
 void L_square_from_flat(const double *restrict Lflat, double *restrict Lsq, const int n);
+void schur_complement01(const double *restrict X, const int n, double *restrict out, double *restrict buffer);
 
 /* norm_grad.cpp */
 double loggrad_x0
@@ -126,6 +127,19 @@ void mnp_classpred
     bool logp
 );
 double mnp_fun_grad
+(
+    const int m, const int k,
+    int nthreads,
+    const bool only_x,
+    double *restrict gradX,
+    double *restrict gradL,
+    const int *restrict y,
+    const double *restrict pred,
+    const double *restrict Lflat,
+    const double *restrict weights /* optional row weights */
+);
+/* Same thing as above, but obtained through finite differencing */
+double mnp_fun_grad_fdiff
 (
     const int m, const int k,
     int nthreads,

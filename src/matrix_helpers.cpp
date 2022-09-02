@@ -70,6 +70,48 @@ void matrix_inverse(double *restrict X, double *restrict Xinv, const int n)
     fill_lower_triangle(Xinv, n);
 }
 
+void schur_complement01(const double *restrict X, const int n, double *restrict out, double *restrict buffer)
+{
+    if (n <= 2) return;
+    const int n2 = n - 2;
+    const int two = 2;
+
+    double detX22 = X[0]*X[n+1] - X[1]*X[n];
+    double reg = 0.;
+    if (detX22 <= 0) {
+        reg = std::sqrt(std::max(std::numeric_limits<double>::min(), std::fabs(detX22)));
+    }
+    double iX22[] = {
+        X[n+1] + reg, -X[1],
+        -X[n], X[0] + reg
+    };
+    for (int ix = 0; ix < 4; ix++) {
+        iX22[ix] /= detX22;
+    }
+
+    cblas_dgemm(
+        CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        2, n2, 2,
+        1., iX22, 2,
+        X + 2, n,
+        0., buffer, n2
+    );
+
+    F77_CALL(dlacpy)(
+        "?", &n2, &n2,
+        X + 2*(n+1), &n,
+        out, &n2
+    );
+
+    cblas_dgemm(
+        CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        n2, n2, 2,
+        -1., X + 2*n, n,
+        buffer, n2,
+        1., out, n2
+    );
+}
+
 void L_square_from_flat(const double *restrict Lflat, double *restrict Lsq, const int n)
 {
     std::fill(Lsq, Lsq + n*n, 0.);

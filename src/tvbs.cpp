@@ -491,7 +491,7 @@ double norm_logcdf
 
             /* TODO: maybe should move these into separate buffers so that it can reuse
                'rho_reordered' and avoid doing this allocation */
-            std::vector<double> rho_copy((n-1)*(n-1));
+            std::vector<double> rho_copy(n*n);
             if (size_block1) {
                 F77_CALL(dlacpy)(
                     "A", &size_block1, &size_block1,
@@ -530,13 +530,13 @@ double norm_logcdf
         }
     }
 
-    double *restrict mu_trunc = buffer; buffer += n;
-    double *restrict L = buffer; buffer += n*n;
-    double *restrict D = buffer; buffer += n*n;
-    double *restrict temp1 = buffer; buffer += n*n;
-    double *restrict temp2 = buffer; buffer += n*n;
-    double *restrict temp3 = buffer; buffer += 2*(n-2);
-    double *restrict temp4 = buffer; buffer += 2*(n-2);
+    double *restrict const mu_trunc = buffer; buffer += n;
+    double *restrict const L = buffer; buffer += n*n;
+    double *restrict const D = buffer; buffer += n*n;
+    double *restrict const temp1 = buffer; buffer += n*n;
+    double *restrict const temp2 = buffer; buffer += n*n;
+    double *restrict const temp3 = buffer; buffer += 2*(n-2);
+    double *restrict const temp4 = buffer; buffer += 2*(n-2);
 
     sort_ascending(
         x_reordered,

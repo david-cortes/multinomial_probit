@@ -36,16 +36,26 @@ class MultinomialProbitRegression(BaseEstimator):
         by the number of rows).
     fit_intercept : bool
         Whether to add intercepts to the coefficients for each class.
-    chol_grad : str, one of "finite_diff" or "plackett"
-        How to calculate gradients for the Cholesky of the model's covariance matrix.
-        If passing "plackett", will use Plackett's formula with the same CDF approximation as the rest
-        of the procedure.
-        If passing "finite_diff", will use finite differencing.
-        While in theory the closed-form from Plackett should be more precise, in practice,
-        since the calculation of the CDF is already an approximation with some inaccuracy, the
-        finite differencing approach tends to be more precise.
-        Note that both approaches involve the same number of CDF calculations albeit Plackett's are
-        for lower-dimensional problems, thus finite differencing is not too much slower.
+    grad : str, one of "analytical" or finite_diff"
+        How to calculate gradients of the MVN CDF parameters.
+
+        If passing "analytical", will use the theoretically correct formula for the gradients given by
+        the MVN PDF plus conditioned CDF (using Plackett's identity for the correlation coefficient
+        gradients), with the same CDF approximation as used for calculating the likelihood.
+
+        If passing "finite_diff", will approximate the gradients through finite differencing.
+
+        In theory, analytical gradients should be more accurate and faster, but in practive, since
+        the CDF is calculated by an imprecise approximation, the analytical gradients of the theoretical
+        CDF might not be too accurate as gradients of this approximation. Both approaches involve the
+        same number of CDF calculations, but for analytical gradients, the problems are reduced by
+        one / two dimensions, which makes them slightly faster.
+
+        Note that this refers to gradients w.r.t the parameters of MVN distributions, not w.r.t to the
+        actual model parameters, which are still obtained by applying the chain rule.
+
+        On smaller datasets in particular, finite differencing can result in more accurate gradients,
+        but on larger datasets, as errors average out, analytical gradients tend to be more accurate.
     warm_start : bool
         In successive calls to ``fit``, whether to reuse previous solutions as starting point
         for the optimization procedure.
@@ -84,10 +94,10 @@ class MultinomialProbitRegression(BaseEstimator):
            Transportation Research Part B: Methodological 109 (2018): 238-256.
     .. [2] Plackett, Robin L. "A reduction formula for normal multivariate integrals." Biometrika 41.3/4 (1954): 351-360.
     """
-    def __init__(self, lambda_=0., fit_intercept=True, chol_grad="finite_diff", warm_start=False, presolve_logistic=True, n_jobs=-1):
+    def __init__(self, lambda_=0., fit_intercept=True, grad="analytical", warm_start=False, presolve_logistic=True, n_jobs=-1):
         self.lambda_ = lambda_
         self.fit_intercept = fit_intercept
-        self.chol_grad = chol_grad
+        self.grad = grad
         self.warm_start = warm_start
         self.presolve_logistic = presolve_logistic
         self.n_jobs = n_jobs
@@ -112,7 +122,7 @@ class MultinomialProbitRegression(BaseEstimator):
             The fitted model (note that it is also modified in-place)
         """
         assert self.lambda_ >= 0
-        assert self.chol_grad in ["finite_diff", "plackett"]
+        assert self.grad in ["finite_diff", "analytical"]
 
         y, sample_weights = self._check_y_and_weights(y, sample_weights)
         self.k_ = y.max() + 1
@@ -170,8 +180,8 @@ class MultinomialProbitRegression(BaseEstimator):
             res = minimize(_mnp_fun_onlyrho, optvars_onlyrho, args_onlyrho, method="BFGS")
             optvars[:numL] = res["x"]
 
-        use_plackett = self.chol_grad == "plackett"
-        args = (X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs, use_plackett)
+        finite_diff = self.grad == "finite_diff"
+        args = (X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs, finite_diff)
         res = minimize(_mnp_fun_grad, optvars, args, jac=True, method="BFGS")
         optvars = res["x"]
 
@@ -188,7 +198,7 @@ class MultinomialProbitRegression(BaseEstimator):
         bfgs.H = res["hess_inv"]
     
         for opt_iter in range(maxiter):
-            f, g = _mnp_fun_grad(optvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs, use_plackett)
+            f, g = _mnp_fun_grad(optvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs, finite_diff)
 
             if opt_iter > 0:
                 bfgs.update(f - prev_f, g - prev_g)
@@ -200,7 +210,7 @@ class MultinomialProbitRegression(BaseEstimator):
             for search_dir in [search_dir_, -g]:
                 for ls in range(maxls):
                     newvars = optvars + step*search_dir
-                    newf = _mnp_fun(newvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs, use_plackett)
+                    newf = _mnp_fun(newvars, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs, finite_diff)
                     if (ls == 0):
                         newf0 = newf
                     predf = step * np.dot(g, search_dir)
@@ -380,7 +390,7 @@ class MultinomialProbitRegression(BaseEstimator):
             sample_weights = np.ones(y.shape[0])
         return y, sample_weights
 
-def _mnp_fun_grad(optvars, X, y, w, k, lam, fit_intercept, nthreads, use_plackett):
+def _mnp_fun_grad(optvars, X, y, w, k, lam, fit_intercept, nthreads, finite_diff):
     m = X.shape[0]
     n = X.shape[1]
     numL = k + int(k*(k-1)/2) - 1
@@ -389,11 +399,8 @@ def _mnp_fun_grad(optvars, X, y, w, k, lam, fit_intercept, nthreads, use_placket
     pred = X @ coefs.T
 
     fun, gradX, gradL = _cpp_wrapper.wrapped_mnp_fun_grad(
-        y, pred, Lflat, w, nthreads, not use_plackett
+        y, pred, Lflat, w, nthreads, False, finite_diff
     )
-
-    if not use_plackett:
-        gradL = approx_fprime(Lflat, _mnp_fun_onlyrho, 1e-5, coefs, X, y, w, k, lam, fit_intercept, nthreads)
 
     grad_out = np.empty(optvars.shape[0])
     grad_out[:numL] = gradL
@@ -423,7 +430,7 @@ def _mnp_fun_grad(optvars, X, y, w, k, lam, fit_intercept, nthreads, use_placket
 
     return fun, grad_out
 
-def _mnp_fun(optvars, X, y, w, k, lam, fit_intercept, nthreads, use_plackett):
+def _mnp_fun(optvars, X, y, w, k, lam, fit_intercept, nthreads, finite_diff):
     m = X.shape[0]
     n = X.shape[1]
     numL = k + int(k*(k-1)/2) - 1

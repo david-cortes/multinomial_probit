@@ -195,6 +195,9 @@ double mnp_likelihood
     const double *restrict weights /* optional row weights */
 )
 {
+    #ifndef _OPENMP
+    nthreads = 1;
+    #endif
     assert(k >= 3);
     std::vector<int> argsorted_y(m);
     std::iota(argsorted_y.begin(), argsorted_y.end(), 0);
@@ -381,6 +384,9 @@ void mnp_classpred
     bool logp
 )
 {
+    #ifndef _OPENMP
+    nthreads = 1;
+    #endif
     assert(k >= 3);
     int k1 = k - 1;
 
@@ -476,6 +482,9 @@ double mnp_fun_grad
     const double *restrict weights /* optional row weights */
 )
 {
+    #ifndef _OPENMP
+    nthreads = 1;
+    #endif
     /* dwork = (5/4)*k^4 + (7/2)*k^3 + (1/4)*k^2 + 5*k*m - 13*k - 4*m + 18
        shorthand = 2*k^4 + 3*k^3 + k^2 + 5*k*m */
     /* iwork = 3*m + 2*k + nthreads + 1 */
@@ -543,7 +552,6 @@ double mnp_fun_grad
     std::vector<double> class_vars(k*k1);
     std::vector<double> class_crossv(k*k1);
     std::vector<double> class_Rhos(k*k1*k1);
-    std::vector<double> class_Cs(k*k1*k1);
     std::vector<bool> class_checkRho(k);
     for (int cl = 0; cl < k; cl++) {
         if (class_indptr[cl] == class_indptr[cl+1]) continue;
@@ -605,11 +613,6 @@ double mnp_fun_grad
             }
         }
         class_checkRho[cl] = check_rho;
-
-        double *classC = class_Cs.data() + cl*k1*k1;
-        if (!only_x) {
-            matrix_inverse(classRho, classC, k1);
-        }
     }
 
     std::vector<double> shifted_pred(m * k1);
@@ -643,7 +646,7 @@ double mnp_fun_grad
     
     std::vector<std::vector<double>> thread_buffer1(nthreads);
     std::vector<std::vector<int>> thread_buffer2(nthreads);
-    int size_dwork_cdf = 5*k1*k1 + 3*k1 - 8;
+    int size_dwork_cdf = 5*k1*k1 + 5*k1 - 8;
     int size_dwork_X = k1 + 2*(k1-1) + k1*k1 + (k1-1)*(k1-1);
     int size_dwork_R = (k1-2)*(k1-2) + (k1-1)*(k1-1) + 2*(k1-1) + k1;
     int size_thread_dwork = size_dwork_cdf + std::max(size_dwork_X, size_dwork_R);
@@ -799,14 +802,13 @@ double mnp_fun_grad
 
     std::vector<double> grad_Rho(k * ktri);
     std::vector<double> iC22(  (k1-2)*(k1-2)  );
-    std::vector<double> iC22_temp(  (k1-2)*(k1-2)  );
+    std::vector<double> buffer_iC22(2*(k1-2));
     std::vector<double> nonsummed_gradRho(m * ktri);
     for (int cl = 0; cl < k; cl++) {
 
         if (class_indptr[cl] == class_indptr[cl+1]) continue;
         
         double *classRho = class_Rhos.data() + cl*k1*k1;
-        double *classC = class_Cs.data() + cl*k1*k1;
         
         int combcounter = 0;
         for (int rrow = 0; rrow < k1-1; rrow++) {
@@ -831,23 +833,9 @@ double mnp_fun_grad
                     k1, 1, rcol
                 );
 
-                swap_entries_sq_matrix(
-                    (double*)nullptr, classC, k1,
-                    k1, 0, rrow
-                );
-                swap_entries_sq_matrix(
-                    (double*)nullptr, classC, k1,
-                    k1, 1, rcol
-                );
-
                 int k3 = k1 - 2;
                 if (k3) {
-                    F77_CALL(dlacpy)(
-                        "?", &k3, &k3,
-                        classC + 2*(k1 + 1), &k1,
-                        iC22_temp.data(), &k3
-                    );
-                    matrix_inverse(iC22_temp.data(), iC22.data(), k3);
+                    schur_complement01(classRho, k1, iC22.data(), buffer_iC22.data());
                 }
 
                 #pragma omp parallel for schedule(static) num_threads(nthreads) \
@@ -900,14 +888,6 @@ double mnp_fun_grad
                 );
                 swap_entries_sq_matrix(
                     (double*)nullptr, classRho, k1,
-                    k1, rrow, 0
-                );
-                swap_entries_sq_matrix(
-                    (double*)nullptr, classC, k1,
-                    k1, rcol, 1
-                );
-                swap_entries_sq_matrix(
-                    (double*)nullptr, classC, k1,
                     k1, rrow, 0
                 );
                 combcounter++;
@@ -1024,6 +1004,319 @@ double mnp_fun_grad
             1., gradL, numL - 1
         );
     }
+
+    return logp;
+}
+
+const double gdiff = std::sqrt(std::numeric_limits<double>::epsilon());
+/* Same thing as above, but obtained through finite differencing */
+double mnp_fun_grad_fdiff
+(
+    const int m, const int k,
+    int nthreads,
+    const bool only_x,
+    double *restrict gradX,
+    double *restrict gradL,
+    const int *restrict y,
+    const double *restrict pred,
+    const double *restrict Lflat,
+    const double *restrict weights /* optional row weights */
+)
+{
+    #ifndef _OPENMP
+    nthreads = 1;
+    #endif
+    /* dwork = (5/4)*k^4 + (7/2)*k^3 + (1/4)*k^2 + 5*k*m - 13*k - 4*m + 18
+       shorthand = 2*k^4 + 3*k^3 + k^2 + 5*k*m */
+    /* iwork = 3*m + 2*k + nthreads + 1 */
+    assert(k >= 3);
+    std::vector<int> argsorted_y(m);
+    std::iota(argsorted_y.begin(), argsorted_y.end(), 0);
+    std::sort(argsorted_y.begin(), argsorted_y.end(), [&y](const int a, const int b){return y[a] < y[b];});
+
+    std::vector<int> resort_out(m);
+    std::iota(resort_out.begin(), resort_out.end(), 0);
+    std::sort(resort_out.begin(), resort_out.end(), [&argsorted_y](const int a, const int b){return argsorted_y[a] < argsorted_y[b];});
+
+    std::vector<int> y_reordered(m);
+    for (int ix = 0; ix < m; ix++) {
+        y_reordered[ix] = y[argsorted_y[ix]];
+    }
+
+    int k1 = k - 1;
+    // int ktri = ncomb2(k1);
+    int numL = k + ncomb2(k);
+    std::vector<double> pred_reordered(m * k1);
+    for (int row = 0; row < m; row++) {
+        std::copy(pred + argsorted_y[row]*k1, pred + (argsorted_y[row]+1)*k1, pred_reordered.begin() + row*k1);
+    }
+
+    std::vector<double> weights_reordered;
+    if (weights) {
+        weights_reordered.resize(m);
+        for (int row = 0; row < m; row++) {
+            weights_reordered[row] = weights[argsorted_y[row]];
+        }
+    }
+
+    std::vector<int> class_indptr(k+1);
+    class_indptr[0] = 0;
+    for (int cl = 1; cl < k;) {
+        int offset = std::distance(
+            y_reordered.data(),
+            std::lower_bound(
+                y_reordered.data() + class_indptr[cl-1],
+                y_reordered.data() + m,
+                cl
+            )
+        );
+        if (offset == m) {
+            for (; cl < k; cl++) {
+                class_indptr[cl] = m;
+            }
+            break;
+        }
+        int n_skip = y_reordered[offset] - cl;
+        for (int ix = 0; ix < n_skip + 1; ix++) {
+            class_indptr[cl] = offset;
+            cl++;
+        }
+    }
+    class_indptr[k] = m;
+
+    std::vector<double> L(k*k);
+    L_square_from_flat(Lflat, L.data(), k);
+
+    std::vector<double> class_Mats(k*k1*k);
+    std::vector<double> class_As(k*k1*k);
+    std::vector<double> class_Sigmas(k*k1*k1);
+    std::vector<double> class_vars(k*k1);
+    std::vector<double> class_crossv(k*k1);
+    std::vector<double> class_Rhos(k*k1*k1);
+    std::vector<double> class_Cs(k*k1*k1);
+    std::vector<bool> class_checkRho(k);
+    for (int cl = 0; cl < k; cl++) {
+        if (class_indptr[cl] == class_indptr[cl+1]) continue;
+
+        double *classMat = class_Mats.data() + cl * k1*k;
+        std::fill(classMat, classMat + k1*k, 0.);
+        for (int ix = 0; ix < k1; ix++) {
+            classMat[ix * (k+1) + (ix>=cl)] = -1.;
+        }
+        for (int row = 0; row < k1; row++) {
+            classMat[cl + row*k] = 1.;
+        }
+
+        double *classA = class_As.data() + cl * k1*k;
+        std::copy(classMat, classMat + k1*k, classA);
+        cblas_dtrmm(
+            CblasRowMajor, CblasRight, CblasLower, CblasNoTrans, CblasNonUnit,
+            k1, k,
+            1., L.data(), k,
+            classA, k
+        );
+
+        double *classSigma = class_Sigmas.data() + cl * k1*k1;
+        cblas_dgemm(
+            CblasRowMajor, CblasNoTrans, CblasTrans,
+            k1, k1, k,
+            1., classA, k,
+            classA, k,
+            0., classSigma, k1
+        );
+
+        double *classCrossv = class_crossv.data() + cl*k1;
+        for (int ix = 0; ix < k1; ix++) {
+            classCrossv[ix] = -1. / (2. * std::pow(classSigma[ix * k], 1.5));
+        }
+
+        double *classVar = class_vars.data() + cl*k1;
+        for (int ix = 0; ix < k1; ix++) {
+            classVar[ix] = std::sqrt(classSigma[ix * k]);
+        }
+
+        double *classRho = class_Rhos.data() + cl*k1*k1;
+        for (int ix = 0; ix < k1; ix++) {
+            classRho[ix * k] = 1.;
+        }
+        for (int row = 0; row < k1-1; row++) {
+            for (int col = row + 1; col < k1; col++) {
+                classRho[col + row*k1] = classSigma[col + row*k1] / (classVar[row] * classVar[col]);
+            }
+        }
+        fill_lower_triangle(classRho, k1);
+
+        bool check_rho = false;
+        for (int row = 0; row < k1-1; row++) {
+            for (int col = row + 1; col < k1; col++) {
+                double abs_rho = std::fabs(classRho[col + row*k1]);
+                check_rho |= abs_rho >= HIGH_RHO;
+                check_rho |= abs_rho <= LOW_RHO;
+            }
+        }
+        class_checkRho[cl] = check_rho;
+
+        double *classC = class_Cs.data() + cl*k1*k1;
+        if (!only_x) {
+            matrix_inverse(classRho, classC, k1);
+        }
+    }
+
+    std::vector<double> shifted_pred(m * k1);
+    for (int cl = 0; cl < k; cl++) {
+        int n_this = class_indptr[cl+1] - class_indptr[cl];
+        if (!n_this) continue;
+        cblas_dgemm(
+            CblasRowMajor, CblasNoTrans, CblasTrans,
+            n_this, k1, k1,
+            1., pred_reordered.data() + class_indptr[cl]*k1, k1,
+            class_Mats.data() + cl * k1*k + 1, k,
+            0., shifted_pred.data() + class_indptr[cl]*k1, k1
+        );
+    }
+
+    /* standardize them */
+    std::vector<double> shifted_pred_std(m * k1);
+    for (int row = 0; row < m; row++) {
+        double *classVars = class_vars.data() + y_reordered[row]*k1;
+        double *predRow = shifted_pred.data() + row*k1;
+        double *predRowStd = shifted_pred_std.data() + row*k1;
+
+        #ifndef _WIN32
+        #pragma omp simd
+        #endif
+        for (int col = 0; col < k1; col++) {
+            predRowStd[col] = predRow[col] / classVars[col];
+        }
+    }
+
+    
+    std::vector<std::vector<double>> thread_buffer1(nthreads);
+    std::vector<std::vector<int>> thread_buffer2(nthreads);
+    int size_dwork_cdf = 5*k1*k1 + 6*k1 - 8;
+
+    for (int tid = 0; tid < nthreads; tid++) {
+        thread_buffer1[tid].resize(size_dwork_cdf);
+        thread_buffer2[tid].resize(k);
+    }
+
+    std::vector<double> log_probs(m);
+    std::vector<double> log_probs_X(m * k1);
+    #pragma omp parallel for schedule(static) num_threads(nthreads) \
+            shared(m, shifted_pred_std, k, k1, class_Rhos, y_reordered, class_checkRho, \
+                   thread_buffer1, thread_buffer2, log_probs, pred_reordered, log_probs_X, class_vars)
+    for (int row = 0; row < m; row++) {
+        int tid = omp_get_thread_num();
+        double *buffer1 = thread_buffer1[tid].data();
+        double *x_local = buffer1; buffer1 += k1;
+        double *R_local = buffer1; buffer1 += k1*k1;
+        int this_y = y_reordered[row];
+
+        std::copy(shifted_pred_std.data() + row*k1, shifted_pred_std.data() + (row+1)*k1, x_local);
+        std::copy(class_Rhos.data() + this_y*k1*k1, class_Rhos.data() + (this_y+1)*k1*k1, R_local);
+
+        log_probs[row] = norm_logcdf(
+            x_local,
+            R_local,
+            k1,
+            class_checkRho[this_y],
+            buffer1,
+            thread_buffer2[tid].data()
+        );
+
+        double *log_probs_rowX = log_probs_X.data() + row*k1;
+        double *predRow = pred_reordered.data() + row*k1;
+        double *classMat = class_Mats.data() + this_y*k1*k;
+
+        for (int cl = 0; cl < k1; cl++) {
+
+            double oldval = predRow[cl];
+            predRow[cl] += gdiff;
+
+            cblas_dgemv(
+                CblasRowMajor, CblasNoTrans,
+                k1, k1,
+                1., classMat + 1, k,
+                predRow, 1,
+                0., x_local, 1
+            );
+
+            predRow[cl] = oldval;
+            
+            double *classVar = class_vars.data() + this_y*k1;
+            #ifndef _WIN32
+            #pragma omp simd
+            #endif
+            for (int ix = 0; ix < k1; ix++) {
+                x_local[ix] /= classVar[ix];
+            }
+
+            std::copy(class_Rhos.data() + this_y*k1*k1, class_Rhos.data() + (this_y+1)*k1*k1, R_local);
+
+            log_probs_rowX[cl] = norm_logcdf(
+                x_local,
+                R_local,
+                k1,
+                true,
+                buffer1,
+                thread_buffer2[tid].data()
+            );
+        }
+    }
+
+    for (int row = 0; row < m; row++) {
+        double logprob_row = log_probs[row];
+        double *logprob_pred = log_probs_X.data() + row*k1;
+
+        /* beware too gridy optimizers, don't make it into a single operation */
+        #ifndef _WIN32
+        #pragma omp simd
+        #endif
+        for (int cl = 0; cl < k1; cl++) {
+            logprob_pred[cl] -= logprob_row;
+        }
+        cblas_dscal(k1, 1. / gdiff, logprob_pred, 1);
+    }
+
+    for (int row = 0; row < m; row++) {
+        std::copy(
+            log_probs_X.data() + resort_out[row]*k1,
+            log_probs_X.data() + (resort_out[row] + 1)*k1,
+            gradX + row*k1
+        );
+    }
+    cblas_dscal(m*k1, -1., gradX, 1);
+
+    double logp;
+    if (!weights) {
+        logp = std::accumulate(log_probs.begin(), log_probs.end(), 0.);
+    }
+    else {
+        logp = cblas_ddot(m, log_probs.data(), 1, weights_reordered.data(), 1);
+    }
+
+    logp = -logp;
+    if (only_x) return logp;
+
+    numL -= 1;
+    std::vector<double> newLflat(Lflat, Lflat + numL);
+    for (int ix = 0; ix < numL; ix++) {
+        double oldval = newLflat[ix];
+        newLflat[ix] += gdiff;
+
+        double newp = mnp_likelihood(
+            m, k,
+            nthreads,
+            y,
+            pred,
+            newLflat.data(),
+            weights
+        );
+        gradL[ix] = (-newp - logp) / gdiff;
+
+        newLflat[ix] = oldval;
+    }
+
 
     return logp;
 }
