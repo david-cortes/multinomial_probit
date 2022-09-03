@@ -171,7 +171,8 @@ class MultinomialProbitRegression(BaseEstimator):
             optvars[numL:] = (model_logistic.coef_[1:,:] - model_logistic.coef_[0,:]).reshape(-1)
             # now update chol(Sigma) indepdendently before proceeding
             coefs = optvars[numL:].reshape((self.k_-1,n))
-            args_onlyrho = (coefs, X, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
+            pred = X @ coefs.T
+            args_onlyrho = (pred, y, sample_weights, self.k_, lam, self.fit_intercept, n_jobs)
             optvars_onlyrho = optvars[:numL]
 
             # Note: finite differencing here is roughly equally as slow as gradient calculations.
@@ -448,10 +449,9 @@ def _mnp_fun(optvars, X, y, w, k, lam, fit_intercept, nthreads, finite_diff):
             fun += lam*np.dot(optvars[numL:], optvars[numL:])
     return fun
 
-def _mnp_fun_onlyrho(optvars, coefs, X, y, w, k, lam, fit_intercept, nthreads):
+def _mnp_fun_onlyrho(optvars, pred, y, w, k, lam, fit_intercept, nthreads):
     numL = k + int(k*(k-1)/2) - 1
     Lflat = optvars[:numL]
-    pred = X @ coefs.T
 
     return _cpp_wrapper.wrapped_mnp_fun(
         y, pred, Lflat, w, nthreads
