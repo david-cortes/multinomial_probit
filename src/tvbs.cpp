@@ -29,6 +29,14 @@ void truncate_bvn_2by2block(const double mu1, const double mu2,
     double log_pdf_tr1 = norm_logpdf_1d(tr1);
     double log_pdf_tr2 = norm_logpdf_1d(tr2);
 
+    /* TODO: would this be the right way of correcting bad PDFs? */
+    // if (std::fabs(tr1) >= 1e2 && (-log_pdf_tr1) > (-logcd1)) {
+    //     log_pdf_tr1 = -std::numeric_limits<double>::infinity();
+    // }
+    // if (std::fabs(tr2) >= 1e2 && (-log_pdf_tr2) > (-logcd2)) {
+    //     log_pdf_tr2 = -std::numeric_limits<double>::infinity();
+    // }
+
     double log_rho = std::log(std::fabs(rho));
     double sign_rho = (rho >= 0.)? 1. : -1.;
     double log_rho_pd2_cd1 = log_rho + log_pd2_cd1;

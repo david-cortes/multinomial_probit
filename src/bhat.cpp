@@ -59,8 +59,10 @@ double norm_logcdf_3d(double x1, double x2, double x3, double rho12, double rho1
         std::swap(x1, x2);
         std::swap(rho13, rho23);
     }
-    
-    double mutilde = -std::exp(norm_logpdf_1d(x1) - norm_logcdf_1d(x1));
+
+    double temp = norm_logpdf_1d(x1) - norm_logcdf_1d(x1);
+    temp = std::fmin(0., temp);
+    double mutilde = -std::exp(temp);
     double omega = 1. + (mutilde * (x1 - mutilde));
 
     double rho12_sq = rho12 * rho12;
