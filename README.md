@@ -1,8 +1,10 @@
 # Multinomial Probit Regression
 
-This is a Python package for fitting multinomial probit (MNP) models, a form of generalized linear regression model for multi-class classification.
+This is an R / Python package for fitting multinomial probit (MNP) models, a form of generalized linear regression model for multi-class classification.
 
 It uses a fast approximation for the CDF of multivariate normal distributions alongside with analytical gradients, which is not accurate enough to make the models competitive against logistic ones in practice (see below for more details), and as such, is not recommended for serious usage but is nevertheless made available for research purposes.
+
+Note: one is more likely to see better results in the R interface compared to the Python one, due to a more careful implementation of the BFGS optimization procedure in R as comapred to SciPy.
 
 # Description
 
@@ -38,6 +40,14 @@ Note that this package only provides functionality for fitting the model paramet
 
 # Installation
 
+* R:
+
+```r
+remotes::install_github("david-cortes/multinomial_probit")
+```
+
+* Python:
+
 ```shell
 pip install git+https://github.com/david-cortes/multinomial_probit.git
 ```
@@ -52,6 +62,23 @@ pip install git+https://github.com/david-cortes/multinomial_probit.git
 ** *
 
 # Sample usage
+
+* R:
+
+```r
+library(multinomial.probit)
+data(iris)
+x <- iris[, 1:4]
+y <- iris$Species
+m <- multinomial.probit(x, y)
+predict(m, x, type="prob")
+predict(m, x, type="class")
+mnp.likelihood(m, x, y)
+```
+
+* Python:
+
+(_Recommended to use the R interface as the BFGS optimizer is better there_)
 
 (The package is scikit-learn-compatible and resembles their `LogisticRegression` class)
 

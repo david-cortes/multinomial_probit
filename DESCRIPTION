@@ -1,0 +1,21 @@
+Package: multinomial.probit
+Type: Package
+Title: Multinomial Probit Regression
+Version: 0.0.1
+Authors@R: c(
+  person(given="David", family="Cortes", role=c("aut", "cre", "cph"),
+         email="david.cortes.rivera@gmail.com"),
+  person(given="Enthought", family="Inc", role="cph",
+         comment="Copyright holder of univariate normal distribution functions"),
+  person(given="SciPy", family="Developers", role="cph",
+         comment="Copyright holder of univariate normal distribution functions")
+  )
+Maintainer: David Cortes <david.cortes.rivera@gmail.com>
+URL: https://github.com/david-cortes/multinomial_probit
+BugReports: https://github.com/david-cortes/multinomial_probit/issues
+Description: Multinomial probit (MNP) regression for multiclass classification.
+License: BSD_3_clause + file LICENSE
+Suggests: glmnet
+VignetteBuilder: knitr
+RoxygenNote: 7.2.1
+NeedsCompilation: yes

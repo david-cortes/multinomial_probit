@@ -18,7 +18,7 @@ class MultinomialProbitRegression(BaseEstimator):
     based on the TVBS method (see references for details) and optimized through the BFGS method from SciPy.
     
     In general, the approximation for the likelihood and gradients is not good enough for the resulting
-    model to be very usable - typically, results are not competitive against simpler multinonial logistic
+    model to be very usable - typically, results are not competitive against simpler multinomial logistic
     regression (which assumes a unit covariance matrix), and as such, is not recommended for serious usage.
 
     Note
@@ -26,6 +26,11 @@ class MultinomialProbitRegression(BaseEstimator):
     If passing ``n_jobs>1``, it is recommended to use a BLAS / LAPACK implementation that would be
     openmp-aware, such as "openblas-openmp" (typically not the default as e.g. numpy from pip bundles
     "openblas-pthreads") or MKL.
+
+    Note
+    ----
+    One is likely to observe better results from the R interface of this package, which uses a more
+    precise implementation of the BFGS solver and more precise row summing algorithm.
 
     Parameters
     ----------
@@ -153,7 +158,7 @@ class MultinomialProbitRegression(BaseEstimator):
                 sample_weights = sample_weights.astype(np.float64)
 
         n_jobs = self._get_njobs()
-        lam = float(self.lambda_) * 2 * m
+        lam = float(self.lambda_) * m
 
         numL = self.k_ + int(self.k_*(self.k_-1)/2) - 1
         optvars = _cpp_wrapper.wrapped_mnp_starting_point(self.k_, n)

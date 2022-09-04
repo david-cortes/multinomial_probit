@@ -1,0 +1,3 @@
+LIBRARY multinomial_probit.dll
+EXPORTS
+ R_init_multinomial_probit
