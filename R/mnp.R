@@ -9,14 +9,14 @@ NULL
 #' @description Fits a multinomial probit regression (for multi-class classification with 3 or more classes), with
 #' likelihoods and gradients computed through a fast approximation to the CDF of the MVN distribution
 #' based on the TVBS method (see references for details) and optimized through the BFGS method.
-#' 
+#'
 #' In general, the approximation for the likelihood and gradients is not good enough for the resulting
 #' model to be very usable - typically, results are not competitive against simpler multinomial logistic
 #' regression (which assumes a unit covariance matrix), and as such, is not recommended for serious usage.
 #' @details If the data is a sparse matrix, it is highly recommended to load library
 #' "MatrixExtra" before running this function, and to pass the "x" data as a CSR matrix of
 #' class "dgRMatrix".
-#' 
+#'
 #' Note that this library uses OpenMP for parallelization. As such, it is recommended to use
 #' BLAS / LAPACK libraries that are OpenMP aware, such as `openblas-openmp` (which is usually
 #' not the default openblas variant) or MKL (you might also want to set environment variable
@@ -42,22 +42,22 @@ NULL
 #' @param lambda Amount of L2 regularization. Note that the regularization is added following GLMNET's formula.
 #' @param intercept Whether to add intercepts to the coefficients for each class.
 #' @param grad How to calculate gradients of the MVN CDF parameters.
-#' 
+#'
 #' If passing "analytical", will use the theoretically correct formula for the gradients given by
 #' the MVN PDF plus conditioned CDF (using Plackett's identity for the correlation coefficient
 #' gradients), with the same CDF approximation as used for calculating the likelihood.
-#' 
+#'
 #' If passing "finite_diff", will approximate the gradients through finite differencing.
-#' 
+#'
 #' In theory, analytical gradients should be more accurate and faster, but in practive, since
 #' the CDF is calculated by an imprecise approximation, the analytical gradients of the theoretical
 #' CDF might not be too accurate as gradients of this approximation. Both approaches involve the
 #' same number of CDF calculations, but for analytical gradients, the problems are reduced by
 #' one / two dimensions, which makes them slightly faster.
-#' 
+#'
 #' Note that this refers to gradients w.r.t the parameters of MVN distributions, not w.r.t to the
 #' actual model parameters, which are still obtained by applying the chain rule.
-#' 
+#'
 #' On smaller datasets in particular, finite differencing can result in more accurate gradients,
 #' but on larger datasets, as errors average out, analytical gradients tend to be more accurate.
 #' @param presolve_logistic Whether to pre-solve for the coefficients by fitting a multinomial \bold{logistic} regression
@@ -105,7 +105,7 @@ multinomial.probit <- function(
     if (presolve_logistic) {
         if (requireNamespace("glmnet")) {
             if (intercept) {
-                model <- glmnet(
+                model <- glmnet::glmnet(
                     x[, 2:ncol(x)], y,
                     weights = weights,
                     family = "multinomial",
@@ -115,7 +115,7 @@ multinomial.probit <- function(
                 )
                 coef <- sapply(coef(model), function(x) x[,ncol(x),drop=TRUE])
             } else {
-                model <- glmnet(
+                model <- glmnet::glmnet(
                     x, y,
                     weights = weights,
                     family = "multinomial",
@@ -132,7 +132,7 @@ multinomial.probit <- function(
             newL <- optvars[1:numL]
             pred <- t(x %*% coef)
             res <- optim(
-                newL, mnp.fun.onlyrho, NULL, pred, y, w, nthreads,
+                newL, mnp.fun.onlyrho, NULL, pred, y, weights, nthreads,
                 method = "BFGS",
                 control = list(maxit = 10000)
             )
@@ -152,7 +152,7 @@ multinomial.probit <- function(
         method = "BFGS",
         control = list(maxit = 10000)
     )
-    
+
     coefs <- matrix(res$par[(numL+1):length(optvars)], nrow=n)
     if (!is.null(colnames(x)))
         row.names(coefs) <- colnames(x)
@@ -373,9 +373,9 @@ mnp.fun <- function(optvars, X, y, w, k, lam, intercept, nthreads, finite_diff) 
     )
     if (lam) {
         if (intercept) {
-            fun <- fun + (as.numeric(coefs) %*% as.numeric(coefs) - coefs[1,,drop=TRUE] %*% coefs[1,,drop=TRUE])
+            fun <- fun + lam*(as.numeric(coefs) %*% as.numeric(coefs) - coefs[1,,drop=TRUE] %*% coefs[1,,drop=TRUE])
         } else {
-            fun <- fun + as.numeric(coefs) %*% as.numeric(coefs)
+            fun <- fun + lam*as.numeric(coefs) %*% as.numeric(coefs)
         }
     }
     return(fun)

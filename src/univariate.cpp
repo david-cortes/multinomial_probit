@@ -43,6 +43,7 @@ double norm_logpdf_1d(double x)
 const static double inv_sqrt2 = 1. / std::sqrt(2.);
 double norm_cdf_1d(double a)
 {
+    if (std::isinf(a)) return 0.;
     double x, y, z;
     x = a * inv_sqrt2;
     z = std::fabs(x);
@@ -64,6 +65,9 @@ double norm_cdf_1d(double a)
 static const double half_log_twoPI = 0.5 * std::log(2. * M_PI);;
 double norm_logcdf_1d(double a)
 {
+    if (std::isinf(a)) {
+        return (a >= 0.)? 0. : -std::numeric_limits<double>::infinity();
+    }
     const double a_sq = a * a;
     double log_LHS;              /* we compute the left hand side of the approx (LHS) in one shot */
     double last_total = 0;       /* variable used to check for convergence */
