@@ -42,15 +42,9 @@ Note that this package only provides functionality for fitting the model paramet
 
 * R:
 
-(**IMPORTANT:** a simple `remotes::install_github` with default arguments won't work due to the repository name having underscores)
-
 ```r
-git clone https://github.com/david-cortes/multinomial_probit.git
-R CMD build multinomial_probit
-R CMD INSTALL multinomial.probit*
+remotes::install_github("david-cortes/multinomial_probit")
 ```
-
-(Alternatively, can download the repository, add it to RStudio as a package project, and install it with the "Install" button in the build pane)
 
 * Python:
 
