@@ -74,7 +74,6 @@ void schur_complement01(const double *restrict X, const int n, double *restrict 
 {
     if (n <= 2) return;
     const int n2 = n - 2;
-    const int two = 2;
 
     double detX22 = X[0]*X[n+1] - X[1]*X[n];
     double reg = 0.;

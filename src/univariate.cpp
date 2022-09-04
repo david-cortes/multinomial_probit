@@ -36,6 +36,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 static const double log_sqrt_twoPI = std::log(std::sqrt(2. * M_PI));
 double norm_logpdf_1d(double x)
 {
+    if (std::isinf(x)) return -std::numeric_limits<double>::infinity();
     return -0.5 * (x*x) - log_sqrt_twoPI;
 }
 
@@ -43,7 +44,9 @@ double norm_logpdf_1d(double x)
 const static double inv_sqrt2 = 1. / std::sqrt(2.);
 double norm_cdf_1d(double a)
 {
-    if (std::isinf(a)) return 0.;
+    if (std::isinf(a)) {
+        return (a >= 0.)? 1. : 0.;
+    }
     double x, y, z;
     x = a * inv_sqrt2;
     z = std::fabs(x);

@@ -20,11 +20,11 @@ double norm_logcdf_2d(double x1, double x2, double rho)
     double log_d1 = norm_logpdf_1d(x1);
     double log_p1 = norm_logcdf_1d(x1);
     double log_l1 = log_d1 - log_p1;
+    log_l1 = std::fmin(0., log_l1);
     double sign_l1 = -1.;
     double log_rho = std::log(std::fabs(rho));
     double sign_rho = (rho >= 0.)? 1. : -1.;
     double log_rl1 = log_rho + log_l1;
-    log_rl1 = std::fmin(0., log_rl1);
     double sign_rl1 = sign_rho * sign_l1;
     double log_x1 = std::log(std::fabs(x1));
     double sign_x1 = (x1 >= 0.)? 1. : -1.;
