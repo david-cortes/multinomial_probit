@@ -130,7 +130,7 @@ multinomial.probit <- function(
             optvars[(numL+1):length(optvars)] <- as.numeric(coef)
 
             newL <- optvars[1:numL]
-            pred <- t(x %*% coef)
+            pred <- t(as.matrix(x %*% coef))
             res <- optim(
                 newL, mnp.fun.onlyrho, NULL, pred, y, weights, nthreads,
                 method = "BFGS",
@@ -299,7 +299,7 @@ mnp.likelihood <- function(model, x, y, weights = NULL, nthreads = parallel::det
         pred <- sweep(pred, 2, model$coefs[1,,drop=TRUE], `+`)
         pred <- t(pred)
     } else {
-        pred <- t(x %*% model$coefs)
+        pred <- t(as.matrix(x %*% model$coefs))
     }
     temp <- check.y.and.weights(y, weights)
     y <- temp[[1]]
@@ -325,7 +325,7 @@ mnp.grad <- function(optvars, X, y, w, k, lam, intercept, nthreads, finite_diff)
     n <- ncol(X)
     numL <- k + (k*(k-1)/2) - 1
     coefs <- matrix(optvars[(numL+1L):length(optvars)], nrow=n)
-    pred <- t(X %*% coefs)
+    pred <- t(as.matrix(X %*% coefs))
     temp <- .Call(
         R_wrapped_mnp_fun_grad,
         y, pred, optvars, w, nthreads, FALSE, finite_diff
@@ -365,7 +365,7 @@ mnp.fun <- function(optvars, X, y, w, k, lam, intercept, nthreads, finite_diff) 
     n <- ncol(X)
     numL <- k + (k*(k-1)/2) - 1
     coefs <- matrix(optvars[(numL+1L):length(optvars)], nrow=n)
-    pred <- t(X %*% coefs)
+    pred <- t(as.matrix(X %*% coefs))
 
     fun <- .Call(
         R_wrapped_mnp_fun,
