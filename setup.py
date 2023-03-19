@@ -261,8 +261,11 @@ setup(
                             include_dirs=[np.get_include(), ".", "./src"],
                             language="c++",
                             install_requires = ["numpy", "cython", "scipy"],
-                            define_macros = [("FOR_PYTHON", None)]
-                            )]
+                            define_macros = [
+                                ("FOR_PYTHON", None),
+                                ("NDEBUG", None),
+                            ]
+                        )]
 )
 
 if not found_omp:
@@ -275,4 +278,3 @@ if not found_omp:
     
     omp_msg += "Then reinstall this package from scratch: 'pip install --upgrade --no-deps --force-reinstall git+https://www.github.com/david-cortes/multinomial_probit.git'.\n"
     warnings.warn(omp_msg)
-
