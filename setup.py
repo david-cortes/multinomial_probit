@@ -58,8 +58,9 @@ class build_ext_subclass( build_ext ):
             self.add_O3()
             self.add_no_math_errno()
             self.add_no_trapping_math()
-            self.add_link_time_optimization()
             self.set_cxxstd()
+            if not is_windows:
+                self.add_link_time_optimization()
 
             # for e in self.extensions:
                 # e.extra_compile_args += ["-fsanitize=address", "-static-libasan", "-ggdb"]
