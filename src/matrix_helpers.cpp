@@ -52,7 +52,7 @@ void matrix_inverse(double *restrict X, double *restrict Xinv, const int n)
             Xinv[ix] /= det;
         }
     }
-    int status;
+    int status = 0;
     double reg = 1e-8;
     std::copy(X, X + n*n, Xinv);
     while (true) {

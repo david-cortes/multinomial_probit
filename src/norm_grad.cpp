@@ -85,7 +85,7 @@ double loggrad_x0
     return mult1 + mult2;
 }
 
-constexpr const double log_inv_twoPI = std::log(1. / (2. * M_PI));
+const double log_inv_twoPI = std::log(1. / (2. * M_PI));
 double loggrad_R01
 (
     const int n,
