@@ -10,26 +10,6 @@ def set_omp_false():
     global found_omp
     found_omp = False
 
-## Modify this to pass your own BLAS/LAPACK linkage parameters:
-custom_blas_link_args = []
-custom_blas_compile_args = []
-# example:
-# custom_blas_link_args = ["-lopenblas"]
-if len(custom_blas_link_args) or len(custom_blas_compile_args):
-    build_ext_with_blas = build_ext
-
-if not (len(custom_blas_link_args) or len(custom_blas_compile_args)):
-    use_findblas = (("findblas" in sys.argv)
-                     or ("-findblas" in sys.argv)
-                     or ("--findblas" in sys.argv))
-    if os.environ.get('USE_FINDBLAS') is not None:
-        use_findblas = True
-    if use_findblas:
-        sys.argv = [a for a in sys.argv if a not in ("findblas", "-findblas", "--findblas")]
-        from findblas.distutils import build_ext_with_blas
-    else:
-        build_ext_with_blas = build_ext
-
 ## Modify this to make the output of the compilation tests more verbose
 silent_tests = not (("verbose" in sys.argv)
                     or ("-verbose" in sys.argv)
@@ -284,3 +264,15 @@ setup(
                             define_macros = [("FOR_PYTHON", None)]
                             )]
 )
+
+if not found_omp:
+    omp_msg  = "\n\n\nCould not detect OpenMP. Package will be built without multi-threading capabilities. "
+    omp_msg += " To enable multi-threading, first install OpenMP"
+    if (sys.platform[:3] == "dar"):
+        omp_msg += " - for macOS: 'brew install libomp'\n"
+    else:
+        omp_msg += " modules for your compiler. "
+    
+    omp_msg += "Then reinstall this package from scratch: 'pip install --upgrade --no-deps --force-reinstall git+https://www.github.com/david-cortes/multinomial_probit.git'.\n"
+    warnings.warn(omp_msg)
+
