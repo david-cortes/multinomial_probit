@@ -42,11 +42,15 @@ Note that this package only provides functionality for fitting the model paramet
 
 * R:
 
+**Note:** This package benefits from extra optimizations that aren't enabled by default for R packages. See [this guide](https://github.com/david-cortes/installing-optimized-libraries) for instructions on how to enable them.
+
 ```r
 remotes::install_github("david-cortes/multinomial_probit")
 ```
 
 * Python:
+
+**Note:** requires a C compiler configured for Python. See [this guide](https://github.com/david-cortes/installing-optimized-libraries) for instructions.
 
 ```shell
 pip install git+https://github.com/david-cortes/multinomial_probit.git
