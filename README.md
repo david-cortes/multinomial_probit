@@ -50,7 +50,7 @@ remotes::install_github("david-cortes/multinomial_probit")
 
 * Python:
 
-**Note:** requires a C compiler configured for Python. See [this guide](https://github.com/david-cortes/installing-optimized-libraries) for instructions.
+**Note:** requires C/C++ compilers configured for Python. See [this guide](https://github.com/david-cortes/installing-optimized-libraries) for instructions.
 
 ```shell
 pip install git+https://github.com/david-cortes/multinomial_probit.git
