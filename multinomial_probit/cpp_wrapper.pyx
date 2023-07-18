@@ -81,7 +81,7 @@ cdef extern from "multinomial_probit.h":
         double * class_Rhos,
         double * class_vars,
         int * class_check_Rho
-    ) nogil except +
+    ) except + nogil
     
     double mnp_likelihood(
         const int m, const int k,
@@ -90,7 +90,7 @@ cdef extern from "multinomial_probit.h":
         const double * pred,
         const double * Lflat,
         const double * weights
-    ) nogil except +
+    ) except + nogil
 
     void mnp_classpred(
         const int m, const int k,
@@ -102,7 +102,7 @@ cdef extern from "multinomial_probit.h":
         const double * class_vars,
         const int * class_check_Rho,
         bool logp
-    ) nogil except +
+    ) except + nogil
 
     double mnp_fun_grad(
         const int m, const int k,
@@ -114,7 +114,7 @@ cdef extern from "multinomial_probit.h":
         const double * pred,
         const double * Lflat,
         const double * weights
-    ) nogil except +
+    ) except + nogil
 
     double mnp_fun_grad_fdiff(
         const int m, const int k,
@@ -126,7 +126,7 @@ cdef extern from "multinomial_probit.h":
         const double * pred,
         const double * Lflat,
         const double * weights
-    ) nogil except +
+    ) except + nogil
 
 def wrapped_mnp_num_vars(int k, int n):
     return get_num_mnp_opt_vars(k, n)
