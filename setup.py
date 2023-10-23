@@ -4,6 +4,7 @@ from Cython.Distutils import build_ext
 import numpy as np
 import sys, os, subprocess
 from os import environ
+import warnings
 
 found_omp = True
 def set_omp_false():
